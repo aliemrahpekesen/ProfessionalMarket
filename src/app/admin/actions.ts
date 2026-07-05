@@ -9,7 +9,14 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { SESSION_COOKIE, checkCredentials, createSessionToken } from "@/lib/auth";
 import { requireAdmin } from "@/lib/adminSession";
-import { createTransfer, addMarketValue, confirmRumor, denyRumor, recomputeCurrentMarketValue } from "@/lib/domain";
+import {
+  createTransfer,
+  addMarketValue,
+  confirmRumor,
+  denyRumor,
+  recomputeCurrentMarketValue,
+  recomputeCurrentCompany,
+} from "@/lib/domain";
 import { uniqueSlug, slugify } from "@/lib/slug";
 import {
   COMPANY_TIERS,
@@ -216,7 +223,14 @@ export async function createTransferAction(formData: FormData) {
 export async function deleteTransferAction(formData: FormData) {
   await requireAdmin();
   const id = str(formData, "id");
-  if (id) await prisma.transfer.delete({ where: { id } });
+  if (id) {
+    const transfer = await prisma.transfer.findUnique({ where: { id } });
+    if (transfer) {
+      await prisma.transfer.delete({ where: { id } });
+      // Keep current company/role consistent with remaining history (#39).
+      await recomputeCurrentCompany(prisma, transfer.professionalId);
+    }
+  }
   refreshPublic();
   redirect("/admin/transfers");
 }
@@ -259,7 +273,10 @@ export async function saveRumorAction(formData: FormData) {
   const status = str(formData, "status");
   const probability = num(formData, "probability");
   if (!professionalId || !targetCompanyId) throw new Error("Missing required fields");
-  if (!isOneOf(RUMOR_STATUSES, status)) throw new Error("Invalid rumor status");
+  // Only open statuses can be set on create; CONFIRMED/DENIED must go through
+  // the confirm/deny actions so their invariants hold (#40).
+  const OPEN_STATUSES = RUMOR_STATUSES.filter((s) => s !== "CONFIRMED" && s !== "DENIED");
+  if (!isOneOf(OPEN_STATUSES, status)) throw new Error("Invalid rumor status");
   if (!Number.isFinite(probability) || probability < 0 || probability > 100) {
     throw new Error("Probability must be between 0 and 100");
   }

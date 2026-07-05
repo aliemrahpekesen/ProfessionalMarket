@@ -89,6 +89,28 @@ export async function addMarketValue(db: Db, input: AddMarketValueInput): Promis
   return record;
 }
 
+/**
+ * Recompute current company and role from the newest remaining transfer.
+ * Needed after deleting a transfer (issue #39): without this, removing the
+ * newest move leaves the professional attached to a company they never
+ * joined according to the remaining history.
+ */
+export async function recomputeCurrentCompany(db: Db, professionalId: string): Promise<string | null> {
+  const newest = await db.transfer.findFirst({
+    where: { professionalId },
+    orderBy: [{ transferDate: "desc" }, { createdAt: "desc" }],
+  });
+  const companyId = newest?.toCompanyId ?? null;
+  await db.professional.update({
+    where: { id: professionalId },
+    data: {
+      currentCompanyId: companyId,
+      ...(newest?.roleAfter ? { role: newest.roleAfter } : {}),
+    },
+  });
+  return companyId;
+}
+
 /** Recompute currentMarketValue from the newest record (0 when none exist). */
 export async function recomputeCurrentMarketValue(db: Db, professionalId: string): Promise<number> {
   const newest = await db.marketValueRecord.findFirst({

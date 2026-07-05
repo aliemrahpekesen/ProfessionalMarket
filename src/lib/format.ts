@@ -1,17 +1,21 @@
 // Formatting helpers. Market values are integer USD/year.
 
-/** Transfermarkt-style money: $950k, $1.25m, $12.5m, $200m, "-" for 0/negative. */
+/** Transfermarkt-style money: $950k, $1.25m, $12.5m, $200m, $1.5b, "-" for 0/negative. */
 export function formatMoney(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "-";
-  if (value >= 1_000_000) {
-    const m = value / 1_000_000;
-    const rounded = m >= 100 ? Math.round(m).toString() : trimZeros(m.toFixed(2));
-    return `$${rounded}m`;
-  }
-  if (value >= 1_000) {
-    return `$${trimZeros((value / 1_000).toFixed(1))}k`;
-  }
-  return `$${value}`;
+  if (value < 1_000) return `$${value}`;
+  // Render in a tier, and promote to the next tier whenever rounding reaches
+  // 1000 of the current unit (999_999 → "$1m", not "$1000k"). See issue #38.
+  const k = renderScaled(value / 1_000, 1);
+  if (Number(k) < 1000) return `$${k}k`;
+  const m = renderScaled(value / 1_000_000, 2);
+  if (Number(m) < 1000) return `$${m}m`;
+  return `$${renderScaled(value / 1_000_000_000, 2)}b`;
+}
+
+/** <100 keeps up-to-`decimals` decimals; >=100 rounds to a whole number. */
+function renderScaled(scaled: number, decimals: number): string {
+  return scaled >= 100 ? Math.round(scaled).toString() : trimZeros(scaled.toFixed(decimals));
 }
 
 function trimZeros(s: string): string {
