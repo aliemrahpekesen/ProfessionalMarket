@@ -1,0 +1,180 @@
+// ProfessionalMarket domain schema.
+// SQLite for dev/demo; PostgreSQL-compatible (swap provider + DATABASE_URL).
+// Enum-like fields are strings validated in src/lib/constants.ts because
+// SQLite does not support Prisma enums.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Industry {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String    @unique
+  description String    @default("")
+  companies   Company[]
+}
+
+model Company {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String   @unique
+  logoColor     String   @default("#00193f")
+  tier          String   @default("ENTERPRISE") // STARTUP | SCALEUP | ENTERPRISE | FORTUNE500
+  hqCity        String   @default("")
+  hqCountry     String   @default("")
+  foundedYear   Int?
+  employeeCount Int?
+  website       String   @default("")
+  industry      Industry @relation(fields: [industryId], references: [id])
+  industryId    String
+
+  roster            Professional[] @relation("CurrentCompany")
+  transfersIn       Transfer[]     @relation("TransferTo")
+  transfersOut      Transfer[]     @relation("TransferFrom")
+  rumorsTargeting   Rumor[]
+  news              NewsItem[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([industryId])
+}
+
+model Agency {
+  id            String         @id @default(cuid())
+  slug          String         @unique
+  name          String         @unique
+  website       String         @default("")
+  professionals Professional[]
+}
+
+model Professional {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  firstName     String
+  lastName      String
+  headshotColor String    @default("#334155")
+  birthDate     DateTime
+  nationality   String // ISO-3166 alpha-2
+  city          String    @default("")
+  role          String // free-text title, e.g. "Staff Backend Engineer"
+  roleGroup     String // ENGINEERING | PRODUCT | DESIGN | DATA | MARKETING | SALES | OPERATIONS | FINANCE | EXECUTIVE
+  seniority     String // JUNIOR | MID | SENIOR | STAFF | PRINCIPAL | DIRECTOR | VP | CLEVEL
+  bio           String    @default("")
+  skills        String    @default("") // comma-separated
+  openToOffers  Boolean   @default(false)
+  contractUntil DateTime?
+
+  currentCompany   Company? @relation("CurrentCompany", fields: [currentCompanyId], references: [id])
+  currentCompanyId String?
+  agency           Agency?  @relation(fields: [agencyId], references: [id])
+  agencyId         String?
+
+  currentMarketValue Int @default(0) // USD per year, derived from latest MarketValueRecord
+
+  marketValues MarketValueRecord[]
+  transfers    Transfer[]
+  rumors       Rumor[]
+  careerStats  CareerStat[]
+  achievements Achievement[]
+  news         NewsItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([currentCompanyId])
+  @@index([currentMarketValue])
+  @@index([roleGroup])
+  @@index([nationality])
+}
+
+model MarketValueRecord {
+  id             String       @id @default(cuid())
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professionalId String
+  value          Int // USD per year
+  recordedAt     DateTime
+  note           String       @default("")
+
+  @@index([professionalId, recordedAt])
+}
+
+model Transfer {
+  id             String       @id @default(cuid())
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professionalId String
+
+  fromCompany   Company? @relation("TransferFrom", fields: [fromCompanyId], references: [id])
+  fromCompanyId String?
+  toCompany     Company? @relation("TransferTo", fields: [toCompanyId], references: [id])
+  toCompanyId   String?
+
+  transferDate          DateTime
+  type                  String // HIRE | CONTRACT | SECONDMENT | PROMOTION | FREE_AGENT
+  package               Int      @default(0) // agreed total comp, USD/year
+  marketValueAtTransfer Int      @default(0)
+  roleAfter             String   @default("")
+  note                  String   @default("")
+  createdAt             DateTime @default(now())
+
+  @@index([professionalId, transferDate])
+  @@index([transferDate])
+}
+
+model Rumor {
+  id             String       @id @default(cuid())
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professionalId String
+  targetCompany  Company      @relation(fields: [targetCompanyId], references: [id], onDelete: Cascade)
+  targetCompanyId String
+
+  probability Int      @default(50) // 0..100
+  status      String   @default("WARMING") // HOT | WARMING | COLD | CONFIRMED | DENIED
+  source      String   @default("")
+  note        String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, probability])
+}
+
+model CareerStat {
+  id                String       @id @default(cuid())
+  professional      Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professionalId    String
+  year              Int
+  teamSize          Int          @default(0)
+  projectsDelivered Int          @default(0)
+  certifications    Int          @default(0)
+  talksGiven        Int          @default(0)
+
+  @@unique([professionalId, year])
+}
+
+model Achievement {
+  id             String       @id @default(cuid())
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professionalId String
+  name           String
+  year           Int
+}
+
+model NewsItem {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  body        String
+  publishedAt DateTime @default(now())
+
+  professional   Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  professionalId String?
+  company        Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyId      String?
+
+  @@index([publishedAt])
+}
