@@ -20,3 +20,5 @@ prisma/*.db-journal
 *.tsbuildinfo
 coverage/
 .DS_Store
+.vercel
+.env*
