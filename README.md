@@ -19,8 +19,9 @@ Next.js 15 (App Router, TypeScript) · Tailwind CSS v4 · Prisma + SQLite
 ## Getting started
 
 ```bash
+cp .env.example .env
 npm install
-npm run db:setup     # prisma generate + migrate + seed
+npm run db:setup     # prisma generate + db push + seed (fictional demo data)
 npm run dev          # http://localhost:3000
 ```
 
@@ -42,3 +43,4 @@ sub-issues, milestones as `M1`–`M4` labels. Roadmap: [docs/ROADMAP.md](docs/RO
 - [Architecture](docs/ARCHITECTURE.md)
 - [Domain model](docs/DOMAIN-MODEL.md)
 - [Roadmap & backlog](docs/ROADMAP.md)
+- [Operations & deployment](docs/OPERATIONS.md)
