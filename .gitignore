@@ -9,6 +9,8 @@ next-env.d.ts
 # prisma / db
 prisma/*.db
 prisma/*.db-journal
+# committed demo snapshot used for serverless (Vercel) deployments
+!prisma/demo.db
 
 # env
 .env
